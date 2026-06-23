@@ -5,7 +5,7 @@
 namespace character {
 
 /// <summary>
-/// ラッシュコンボの相手になる敵キャラクター。
+/// 弱攻撃・強攻撃コンボの相手になる敵キャラクター。
 /// </summary>
 class Enemy final : public CombatCharacter {
 public:

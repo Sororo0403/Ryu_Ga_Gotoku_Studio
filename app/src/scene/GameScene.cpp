@@ -50,7 +50,7 @@ void GameScene::Initialize(const SceneContext& ctx) {
     ResetCombat();
 
     if (ctx_->systems.log) {
-        ctx_->systems.log("Rush combo prototype initialized");
+        ctx_->systems.log("Weak / strong combo prototype initialized");
     }
 }
 
@@ -121,15 +121,20 @@ void GameScene::DrawPostProcessOverlay() {
         return;
     }
 
-    char text[256]{};
+    char text[384]{};
+    const char* attackName =
+        player_.GetComboIndex() >= 0 ? player_.CurrentAttack().name : "None";
     std::snprintf(text, sizeof(text),
-                  "Rush Combo Prototype\n"
-                  "Move: WASD / Left Stick  Attack: J / Left Click / Pad X  "
+                  "Weak / Strong Combo Prototype\n"
+                  "Move: WASD / Left Stick  Weak: J / Left Click / Pad X  "
+                  "Strong: K / Pad Y  "
                   "Lock: LShift / Right Click / LB  Camera: Mouse / Right Stick  "
                   "Reset: R  Exit: Esc\n"
-                  "State: %s  Combo: %d  Enemy HP: %.0f  Buffered: %s  Lock: %s  Respawn: %.1f",
-                  combat::CombatStateName(player_.GetState()), player_.GetComboIndex() + 1,
-                  enemy_.GetHealth(), player_.HasBufferedAttack() ? "yes" : "no",
+                  "State: %s  Move: %s  Enemy HP: %.0f  WeakBuf: %s  StrongBuf: %s  "
+                  "Lock: %s  Respawn: %.1f",
+                  combat::CombatStateName(player_.GetState()), attackName, enemy_.GetHealth(),
+                  player_.HasBufferedAttack() ? "yes" : "no",
+                  player_.HasBufferedStrongAttack() ? "yes" : "no",
                   player_.IsLockOnHeld() ? "on" : "off",
                   enemyRespawnPending_ ? enemyRespawnTimer_ : 0.0f);
 

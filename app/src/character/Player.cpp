@@ -19,18 +19,26 @@ constexpr float kAttackLungeMinEnemySpacing = 0.58f;
 namespace character {
 
 void Player::Reset(const DirectX::XMFLOAT3& position, float facing, float health) {
-    rushCombo_[0] = {"Rush 1", 0.14f, 0.15f, 0.28f, 0.24f, 0.48f, 8.0f, 0.06f, 0.45f,
+    weakCombo_[0] = {"Weak 1", 0.14f, 0.15f, 0.28f, 0.24f, 0.48f, 8.0f, 0.06f, 0.45f,
                      0.9f, 0.72f, combat::HitReaction::Stick, {0.65f, 0.9f, 0.0f},
                      {0.78f, 0.75f, 0.92f}, 0.0f, {1.0f, 0.0f, 0.0f}, 0.0f, 0.0f};
-    rushCombo_[1] = {"Rush 2", 0.13f, 0.16f, 0.30f, 0.24f, 0.50f, 9.0f, 0.065f, 0.55f,
+    weakCombo_[1] = {"Weak 2", 0.13f, 0.16f, 0.30f, 0.24f, 0.50f, 9.0f, 0.065f, 0.55f,
                      0.95f, 0.74f, combat::HitReaction::Stick, {0.72f, 0.9f, 0.0f},
                      {0.82f, 0.78f, 0.92f}, 0.0f, {1.0f, 0.0f, 0.0f}, 0.0f, 0.0f};
-    rushCombo_[2] = {"Rush 3", 0.16f, 0.17f, 0.34f, 0.28f, 0.56f, 11.0f, 0.07f, 0.72f,
+    weakCombo_[2] = {"Weak 3", 0.16f, 0.17f, 0.34f, 0.28f, 0.56f, 11.0f, 0.07f, 0.72f,
                      1.0f, 0.78f, combat::HitReaction::Stick, {0.76f, 0.82f, 0.0f},
                      {0.9f, 0.78f, 1.0f}, 0.55f, {1.0f, 0.0f, 0.0f}, 0.05f, 0.20f};
-    rushCombo_[3] = {"Rush Finish", 0.22f, 0.20f, 0.52f, 0.0f, 0.0f, 18.0f, 0.09f, 1.45f,
+    weakCombo_[3] = {"Weak 4", 0.22f, 0.20f, 0.52f, 0.0f, 0.0f, 18.0f, 0.09f, 1.45f,
                      0.0f, 0.0f, combat::HitReaction::Knockback, {0.86f, 0.95f, 0.0f},
                      {1.05f, 0.95f, 1.08f}, 0.78f, {1.0f, 0.0f, 0.0f}, 0.04f, 0.25f};
+    strongCombo_[0] = {"Strong 1", 0.26f, 0.18f, 0.48f, 0.34f, 0.66f, 18.0f, 0.10f,
+                       1.20f, 0.0f, 0.0f, combat::HitReaction::Knockback,
+                       {0.88f, 0.95f, 0.0f}, {1.12f, 0.98f, 1.08f}, 0.82f,
+                       {1.0f, 0.0f, 0.0f}, 0.05f, 0.27f, 0.42f};
+    strongCombo_[1] = {"Strong 2", 0.34f, 0.20f, 0.70f, 0.0f, 0.0f, 32.0f, 0.15f,
+                       2.35f, 0.0f, 0.0f, combat::HitReaction::Knockback,
+                       {1.02f, 0.98f, 0.0f}, {1.34f, 1.08f, 1.18f}, 1.10f,
+                       {1.0f, 0.0f, 0.0f}, 0.05f, 0.34f, 0.60f};
 
     transform_ = {};
     transform_.position = position;
@@ -42,6 +50,8 @@ void Player::Reset(const DirectX::XMFLOAT3& position, float facing, float health
     hitStopTimer_ = 0.0f;
     attackCooldownTimer_ = 0.0f;
     attackInputBuffered_ = false;
+    strongAttackInputBuffered_ = false;
+    strongAttackActive_ = false;
     currentAttackHit_ = false;
     resetRequested_ = false;
     lockOnHeld_ = false;
@@ -56,15 +66,20 @@ void Player::UpdateInput(const Input& input, float deltaTime) {
     const bool attackTriggered =
         input.IsKeyTrigger(DIK_J) || input.IsMouseTrigger(0) ||
         input.IsGamepadButtonTrigger(XINPUT_GAMEPAD_X);
+    const bool strongAttackTriggered =
+        input.IsKeyTrigger(DIK_K) || input.IsGamepadButtonTrigger(XINPUT_GAMEPAD_Y);
     if (IsAttackCooldownActive()) {
         ClearAttackBuffer();
+    } else if (strongAttackTriggered) {
+        strongAttackInputBuffered_ = true;
+        inputBufferTimer_ = kInputBufferSeconds;
     } else if (attackTriggered) {
         attackInputBuffered_ = true;
         inputBufferTimer_ = kInputBufferSeconds;
     } else if (inputBufferTimer_ > 0.0f) {
         inputBufferTimer_ = std::max(0.0f, inputBufferTimer_ - deltaTime);
         if (inputBufferTimer_ <= 0.0f) {
-            attackInputBuffered_ = false;
+            ClearAttackBuffer();
         }
     }
 
@@ -117,6 +132,11 @@ void Player::Update(float deltaTime, const Input* input, const DirectX::XMFLOAT3
         return;
     }
 
+    if (strongAttackInputBuffered_ && !IsAttackCooldownActive()) {
+        StartStrongAttack(0, enemyPosition, attackDirection);
+        return;
+    }
+
     if (attackInputBuffered_ && !IsAttackCooldownActive()) {
         StartAttack(0, enemyPosition, attackDirection);
         return;
@@ -161,6 +181,10 @@ bool Player::HasBufferedAttack() const {
     return attackInputBuffered_;
 }
 
+bool Player::HasBufferedStrongAttack() const {
+    return strongAttackInputBuffered_;
+}
+
 bool Player::IsAttackActive() const {
     if (currentComboIndex_ < 0) {
         return false;
@@ -190,13 +214,22 @@ int Player::GetComboIndex() const {
     return currentComboIndex_;
 }
 
+bool Player::IsStrongAttackActive() const {
+    return strongAttackActive_;
+}
+
 float Player::GetHitStopTimer() const {
     return hitStopTimer_;
 }
 
 const combat::AttackMove& Player::CurrentAttack() const {
-    const int index = std::clamp(currentComboIndex_, 0, kMaxRushCombo - 1);
-    return rushCombo_[index];
+    if (strongAttackActive_) {
+        const int index = std::clamp(currentComboIndex_, 0, kMaxStrongCombo - 1);
+        return strongCombo_[index];
+    }
+
+    const int index = std::clamp(currentComboIndex_, 0, kMaxWeakCombo - 1);
+    return weakCombo_[index];
 }
 
 CollisionManager::Shape Player::MakeAttackShape(Transform& outDebugTransform) const {
@@ -220,11 +253,11 @@ CollisionManager::Shape Player::MakeAttackShape(Transform& outDebugTransform) co
 
 void Player::StartAttack(int comboIndex, const DirectX::XMFLOAT3& enemyPosition,
                          const DirectX::XMFLOAT3* attackDirection) {
-    currentComboIndex_ = std::clamp(comboIndex, 0, kMaxRushCombo - 1);
+    currentComboIndex_ = std::clamp(comboIndex, 0, kMaxWeakCombo - 1);
     attackTimer_ = 0.0f;
     currentAttackHit_ = false;
-    attackInputBuffered_ = false;
-    inputBufferTimer_ = 0.0f;
+    strongAttackActive_ = false;
+    ClearAttackBuffer();
     state_ = combat::CombatState::AttackStartup;
     if (attackDirection) {
         SetFacingDirection(*attackDirection);
@@ -233,13 +266,39 @@ void Player::StartAttack(int comboIndex, const DirectX::XMFLOAT3& enemyPosition,
     }
 }
 
+void Player::StartStrongAttack(int comboIndex, const DirectX::XMFLOAT3& enemyPosition,
+                               const DirectX::XMFLOAT3* attackDirection) {
+    currentComboIndex_ = std::clamp(comboIndex, 0, kMaxStrongCombo - 1);
+    attackTimer_ = 0.0f;
+    currentAttackHit_ = false;
+    strongAttackActive_ = true;
+    ClearAttackBuffer();
+    state_ = combat::CombatState::AttackStartup;
+    if (attackDirection) {
+        SetFacingDirection(*attackDirection);
+    } else {
+        SetFacingToward(enemyPosition);
+    }
+}
+
 void Player::AdvanceComboIfBuffered(const DirectX::XMFLOAT3& enemyPosition,
                                     const DirectX::XMFLOAT3* attackDirection) {
     if (!attackInputBuffered_) {
+        if (strongAttackActive_ && strongAttackInputBuffered_) {
+            if (currentComboIndex_ + 1 < kMaxStrongCombo) {
+                StartStrongAttack(currentComboIndex_ + 1, enemyPosition, attackDirection);
+            } else {
+                ClearAttackBuffer();
+            }
+        }
         return;
     }
 
-    if (currentComboIndex_ + 1 >= kMaxRushCombo) {
+    if (strongAttackActive_) {
+        return;
+    }
+
+    if (currentComboIndex_ + 1 >= kMaxWeakCombo) {
         attackInputBuffered_ = false;
         inputBufferTimer_ = 0.0f;
         return;
@@ -249,9 +308,12 @@ void Player::AdvanceComboIfBuffered(const DirectX::XMFLOAT3& enemyPosition,
 }
 
 void Player::FinishAttack() {
-    const bool finishedCombo = currentComboIndex_ + 1 >= kMaxRushCombo;
+    const bool finishedCombo =
+        strongAttackActive_ ? currentComboIndex_ + 1 >= kMaxStrongCombo
+                            : currentComboIndex_ + 1 >= kMaxWeakCombo;
     currentComboIndex_ = -1;
     attackTimer_ = 0.0f;
+    strongAttackActive_ = false;
     currentAttackHit_ = false;
     ClearAttackBuffer();
     if (finishedCombo) {
@@ -270,6 +332,7 @@ void Player::UpdateAttackCooldown(float deltaTime) {
 
 void Player::ClearAttackBuffer() {
     attackInputBuffered_ = false;
+    strongAttackInputBuffered_ = false;
     inputBufferTimer_ = 0.0f;
 }
 
@@ -331,7 +394,14 @@ bool Player::IsAttacking() const {
 }
 
 bool Player::CanChainNow() const {
-    if (currentComboIndex_ < 0 || currentComboIndex_ + 1 >= kMaxRushCombo) {
+    if (currentComboIndex_ < 0) {
+        return false;
+    }
+
+    if (strongAttackActive_ && currentComboIndex_ + 1 >= kMaxStrongCombo) {
+        return false;
+    }
+    if (!strongAttackActive_ && currentComboIndex_ + 1 >= kMaxWeakCombo) {
         return false;
     }
 

@@ -25,7 +25,7 @@ enum class HitReaction {
 };
 
 /// <summary>
-/// ラッシュコンボ 1 段分の攻撃性能。
+/// 弱攻撃・強攻撃コンボ 1 段分の攻撃性能。
 /// </summary>
 struct AttackMove {
     const char* name = "";
@@ -46,6 +46,7 @@ struct AttackMove {
     DirectX::XMFLOAT3 lungeDirection{1.0f, 0.0f, 0.0f};
     float lungeStart = 0.0f;
     float lungeEnd = 0.0f;
+    float hitStun = 0.32f;
 };
 
 /// <summary>

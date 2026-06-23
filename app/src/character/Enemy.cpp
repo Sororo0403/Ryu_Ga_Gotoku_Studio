@@ -5,7 +5,6 @@
 
 namespace {
 constexpr float kEnemyFriction = 7.5f;
-constexpr float kEnemyHitStun = 0.32f;
 
 float Clamp01(float value) {
     return std::clamp(value, 0.0f, 1.0f);
@@ -58,7 +57,7 @@ void Enemy::Update(float deltaTime, const DirectX::XMFLOAT3& playerPosition) {
 void Enemy::ApplyHit(const combat::AttackMove& attack, const DirectX::XMFLOAT3& attackerPosition,
                      const DirectX::XMFLOAT3& attackerForward) {
     health_ = std::max(0.0f, health_ - attack.damage);
-    stunTimer_ = kEnemyHitStun;
+    stunTimer_ = std::max(0.0f, attack.hitStun);
     state_ = combat::CombatState::HitStun;
 
     const DirectX::XMFLOAT3 forward = NormalizeForward(attackerForward, -facing_);

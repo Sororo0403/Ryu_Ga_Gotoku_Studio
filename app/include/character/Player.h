@@ -7,11 +7,12 @@ class Input;
 namespace character {
 
 /// <summary>
-/// プレイヤーの移動、入力、ラッシュコンボ状態を管理するクラス。
+/// プレイヤーの移動、入力、弱攻撃・強攻撃コンボ状態を管理するクラス。
 /// </summary>
 class Player final : public CombatCharacter {
 public:
-    static constexpr int kMaxRushCombo = 4;
+    static constexpr int kMaxWeakCombo = 4;
+    static constexpr int kMaxStrongCombo = 2;
 
     /// <summary>
     /// 初期位置、向き、体力を設定してプレイヤーを初期状態へ戻す。
@@ -22,14 +23,14 @@ public:
     void Reset(const DirectX::XMFLOAT3& position, float facing, float health);
 
     /// <summary>
-    /// 攻撃入力、入力バッファ、リセット入力を更新する。
+    /// 弱攻撃・強攻撃入力、入力バッファ、リセット入力を更新する。
     /// </summary>
     /// <param name="input">現在フレームの入力状態。</param>
     /// <param name="deltaTime">前フレームからの経過秒数。</param>
     void UpdateInput(const Input& input, float deltaTime);
 
     /// <summary>
-    /// 移動、攻撃状態、コンボ派生を更新する。
+    /// 移動、攻撃状態、弱攻撃・強攻撃コンボ進行を更新する。
     /// </summary>
     /// <param name="deltaTime">前フレームからの経過秒数。</param>
     /// <param name="input">移動入力に使う入力状態。入力がない場合は nullptr。</param>
@@ -63,10 +64,16 @@ public:
     void ClearResetRequest();
 
     /// <summary>
-    /// 攻撃入力がバッファ中かを取得する。
+    /// 弱攻撃入力がバッファ中かを取得する。
     /// </summary>
-    /// <returns>攻撃入力がバッファ中なら true。</returns>
+    /// <returns>弱攻撃入力がバッファ中なら true。</returns>
     [[nodiscard]] bool HasBufferedAttack() const;
+
+    /// <summary>
+    /// 強攻撃入力がバッファ中かを取得する。
+    /// </summary>
+    /// <returns>強攻撃入力がバッファ中なら true。</returns>
+    [[nodiscard]] bool HasBufferedStrongAttack() const;
 
     /// <summary>
     /// 現在の攻撃がアクティブフレーム中かを取得する。
@@ -104,6 +111,12 @@ public:
     [[nodiscard]] int GetComboIndex() const;
 
     /// <summary>
+    /// 現在の攻撃が強攻撃コンボかを取得する。
+    /// </summary>
+    /// <returns>強攻撃コンボ中なら true。</returns>
+    [[nodiscard]] bool IsStrongAttackActive() const;
+
+    /// <summary>
     /// 残りヒットストップ時間を取得する。
     /// </summary>
     /// <returns>残りヒットストップ秒数。</returns>
@@ -124,16 +137,25 @@ public:
 
 private:
     /// <summary>
-    /// 指定したコンボ段の攻撃を開始する。
+    /// 弱攻撃を開始する。
     /// </summary>
-    /// <param name="comboIndex">開始するコンボ段数インデックス。</param>
+    /// <param name="comboIndex">開始する弱攻撃の段数インデックス。</param>
     /// <param name="enemyPosition">攻撃開始時に向く敵位置。</param>
     /// <param name="attackDirection">攻撃方向へ使う入力方向。入力がない場合は nullptr。</param>
     void StartAttack(int comboIndex, const DirectX::XMFLOAT3& enemyPosition,
                      const DirectX::XMFLOAT3* attackDirection);
 
     /// <summary>
-    /// バッファ入力があり、派生可能なら次のコンボ段へ進める。
+    /// 強攻撃を開始する。
+    /// </summary>
+    /// <param name="comboIndex">開始する強攻撃の段数インデックス。</param>
+    /// <param name="enemyPosition">攻撃開始時に向く敵位置。</param>
+    /// <param name="attackDirection">攻撃方向へ使う入力方向。入力がない場合は nullptr。</param>
+    void StartStrongAttack(int comboIndex, const DirectX::XMFLOAT3& enemyPosition,
+                           const DirectX::XMFLOAT3* attackDirection);
+
+    /// <summary>
+    /// バッファ入力があり、同じ攻撃種別の次段へ進めるなら進行する。
     /// </summary>
     /// <param name="enemyPosition">次段開始時に向く敵位置。</param>
     /// <param name="attackDirection">次段の攻撃方向へ使う入力方向。入力がない場合は nullptr。</param>
@@ -175,9 +197,9 @@ private:
     [[nodiscard]] bool IsAttacking() const;
 
     /// <summary>
-    /// 現在のタイミングで次段へ派生可能かを取得する。
+    /// 現在のタイミングで同じ攻撃種別の次段へ進行可能かを取得する。
     /// </summary>
-    /// <returns>派生受付時間内なら true。</returns>
+    /// <returns>次段受付時間内なら true。</returns>
     [[nodiscard]] bool CanChainNow() const;
 
     /// <summary>
@@ -219,13 +241,16 @@ private:
     /// </summary>
     void ClampToStage();
 
-    combat::AttackMove rushCombo_[kMaxRushCombo]{};
+    combat::AttackMove weakCombo_[kMaxWeakCombo]{};
+    combat::AttackMove strongCombo_[kMaxStrongCombo]{};
     int currentComboIndex_ = -1;
     float attackTimer_ = 0.0f;
     float inputBufferTimer_ = 0.0f;
     float hitStopTimer_ = 0.0f;
     float attackCooldownTimer_ = 0.0f;
     bool attackInputBuffered_ = false;
+    bool strongAttackInputBuffered_ = false;
+    bool strongAttackActive_ = false;
     bool currentAttackHit_ = false;
     bool resetRequested_ = false;
     bool lockOnHeld_ = false;

@@ -77,13 +77,23 @@ void Player::Update(float deltaTime, const Input* input, const DirectX::XMFLOAT3
                     const DirectX::XMFLOAT3& enemyPosition) {
     UpdateAttackCooldown(deltaTime);
 
+    DirectX::XMFLOAT3 inputMoveDirection{};
+    const bool hasInputMoveDirection = TryCalculateCameraRelativeMoveDirection(
+        input, cameraForward, cameraRight, inputMoveDirection);
+    const DirectX::XMFLOAT3* attackDirection =
+        hasInputMoveDirection ? &inputMoveDirection : nullptr;
+
     if (IsAttacking()) {
-        if (lockOnHeld_) {
-            SetFacingToward(enemyPosition);
+        const combat::AttackMove& attack = CurrentAttack();
+        if (attackTimer_ < attack.startup) {
+            if (hasInputMoveDirection) {
+                SetFacingDirection(inputMoveDirection);
+            } else if (lockOnHeld_) {
+                SetFacingToward(enemyPosition);
+            }
         }
 
         attackTimer_ += deltaTime;
-        const combat::AttackMove& attack = CurrentAttack();
 
         if (attackTimer_ < attack.startup) {
             state_ = combat::CombatState::AttackStartup;
@@ -94,7 +104,7 @@ void Player::Update(float deltaTime, const Input* input, const DirectX::XMFLOAT3
         }
 
         if (CanChainNow()) {
-            AdvanceComboIfBuffered(enemyPosition);
+            AdvanceComboIfBuffered(enemyPosition, attackDirection);
             return;
         }
 
@@ -105,53 +115,18 @@ void Player::Update(float deltaTime, const Input* input, const DirectX::XMFLOAT3
     }
 
     if (attackInputBuffered_ && !IsAttackCooldownActive()) {
-        StartAttack(0, enemyPosition);
+        StartAttack(0, enemyPosition, attackDirection);
         return;
     }
 
-    float moveX = 0.0f;
-    float moveZ = 0.0f;
-    if (input) {
-        if (input->IsKeyPress(DIK_A)) {
-            moveX -= 1.0f;
-        }
-        if (input->IsKeyPress(DIK_D)) {
-            moveX += 1.0f;
-        }
-        if (input->IsKeyPress(DIK_W)) {
-            moveZ += 1.0f;
-        }
-        if (input->IsKeyPress(DIK_S)) {
-            moveZ -= 1.0f;
-        }
-        moveX += input->GetGamepadLeftStickX();
-        moveZ += input->GetGamepadLeftStickY();
-    }
-
-    const float length = std::sqrt(moveX * moveX + moveZ * moveZ);
-    if (length > 0.05f) {
-        moveX /= std::max(length, 1.0f);
-        moveZ /= std::max(length, 1.0f);
-        const DirectX::XMFLOAT3 moveDirection{
-            cameraRight.x * moveX + cameraForward.x * moveZ,
-            0.0f,
-            cameraRight.z * moveX + cameraForward.z * moveZ,
-        };
-        const float moveDirectionLength =
-            std::sqrt(moveDirection.x * moveDirection.x + moveDirection.z * moveDirection.z);
-        const DirectX::XMFLOAT3 normalizedMoveDirection{
-            moveDirection.x / std::max(moveDirectionLength, 1.0f),
-            0.0f,
-            moveDirection.z / std::max(moveDirectionLength, 1.0f),
-        };
-
-        transform_.position.x += normalizedMoveDirection.x * kPlayerMoveSpeed * deltaTime;
-        transform_.position.z += normalizedMoveDirection.z * kPlayerMoveSpeed * deltaTime;
+    if (hasInputMoveDirection) {
+        transform_.position.x += inputMoveDirection.x * kPlayerMoveSpeed * deltaTime;
+        transform_.position.z += inputMoveDirection.z * kPlayerMoveSpeed * deltaTime;
         state_ = combat::CombatState::Move;
         if (lockOnHeld_) {
             SetFacingToward(enemyPosition);
         } else {
-            SetFacingDirection(normalizedMoveDirection);
+            SetFacingDirection(inputMoveDirection);
         }
     } else {
         state_ = combat::CombatState::Idle;
@@ -245,19 +220,23 @@ CollisionManager::Shape Player::MakeAttackShape(Transform& outDebugTransform) co
     return CollisionManager::Shape::FromOBB(box);
 }
 
-void Player::StartAttack(int comboIndex, const DirectX::XMFLOAT3& enemyPosition) {
+void Player::StartAttack(int comboIndex, const DirectX::XMFLOAT3& enemyPosition,
+                         const DirectX::XMFLOAT3* attackDirection) {
     currentComboIndex_ = std::clamp(comboIndex, 0, kMaxRushCombo - 1);
     attackTimer_ = 0.0f;
     currentAttackHit_ = false;
     attackInputBuffered_ = false;
     inputBufferTimer_ = 0.0f;
     state_ = combat::CombatState::AttackStartup;
-    if (lockOnHeld_) {
+    if (attackDirection) {
+        SetFacingDirection(*attackDirection);
+    } else if (lockOnHeld_) {
         SetFacingToward(enemyPosition);
     }
 }
 
-void Player::AdvanceComboIfBuffered(const DirectX::XMFLOAT3& enemyPosition) {
+void Player::AdvanceComboIfBuffered(const DirectX::XMFLOAT3& enemyPosition,
+                                    const DirectX::XMFLOAT3* attackDirection) {
     if (!attackInputBuffered_) {
         return;
     }
@@ -268,7 +247,7 @@ void Player::AdvanceComboIfBuffered(const DirectX::XMFLOAT3& enemyPosition) {
         return;
     }
 
-    StartAttack(currentComboIndex_ + 1, enemyPosition);
+    StartAttack(currentComboIndex_ + 1, enemyPosition, attackDirection);
 }
 
 void Player::FinishAttack() {
@@ -294,6 +273,57 @@ void Player::UpdateAttackCooldown(float deltaTime) {
 void Player::ClearAttackBuffer() {
     attackInputBuffered_ = false;
     inputBufferTimer_ = 0.0f;
+}
+
+bool Player::TryCalculateCameraRelativeMoveDirection(
+    const Input* input, const DirectX::XMFLOAT3& cameraForward,
+    const DirectX::XMFLOAT3& cameraRight, DirectX::XMFLOAT3& outMoveDirection) const {
+    outMoveDirection = {};
+    if (!input) {
+        return false;
+    }
+
+    float moveX = 0.0f;
+    float moveZ = 0.0f;
+    if (input->IsKeyPress(DIK_A)) {
+        moveX -= 1.0f;
+    }
+    if (input->IsKeyPress(DIK_D)) {
+        moveX += 1.0f;
+    }
+    if (input->IsKeyPress(DIK_W)) {
+        moveZ += 1.0f;
+    }
+    if (input->IsKeyPress(DIK_S)) {
+        moveZ -= 1.0f;
+    }
+    moveX += input->GetGamepadLeftStickX();
+    moveZ += input->GetGamepadLeftStickY();
+
+    const float inputLength = std::sqrt(moveX * moveX + moveZ * moveZ);
+    if (inputLength <= 0.05f) {
+        return false;
+    }
+
+    moveX /= std::max(inputLength, 1.0f);
+    moveZ /= std::max(inputLength, 1.0f);
+    const DirectX::XMFLOAT3 moveDirection{
+        cameraRight.x * moveX + cameraForward.x * moveZ,
+        0.0f,
+        cameraRight.z * moveX + cameraForward.z * moveZ,
+    };
+    const float moveDirectionLength =
+        std::sqrt(moveDirection.x * moveDirection.x + moveDirection.z * moveDirection.z);
+    if (moveDirectionLength <= 0.0001f) {
+        return false;
+    }
+
+    outMoveDirection = {
+        moveDirection.x / std::max(moveDirectionLength, 1.0f),
+        0.0f,
+        moveDirection.z / std::max(moveDirectionLength, 1.0f),
+    };
+    return true;
 }
 
 bool Player::IsAttacking() const {

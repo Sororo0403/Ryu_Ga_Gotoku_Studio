@@ -20,8 +20,6 @@ constexpr float kOrbitYawSpeed = 1.8f;
 constexpr float kOrbitPitchSpeed = 1.2f;
 constexpr float kOrbitMouseYawSpeed = 0.0035f;
 constexpr float kOrbitMousePitchSpeed = 0.0030f;
-constexpr float kOrbitZoomSpeed = 1.5f;
-constexpr float kOrbitWheelZoomSpeed = 0.0018f;
 constexpr float kOrbitMinPitch = 0.08f;
 constexpr float kOrbitMaxPitch = 0.90f;
 constexpr float kOrbitMinDistance = 4.5f;
@@ -127,7 +125,7 @@ void GameScene::DrawPostProcessOverlay() {
     std::snprintf(text, sizeof(text),
                   "Rush Combo Prototype\n"
                   "Move: WASD / Left Stick  Attack: J / Left Click / Pad X  "
-                  "Lock: LShift / Right Click / LB  Camera: Mouse / Right Stick / Wheel  "
+                  "Lock: LShift / Right Click / LB  Camera: Mouse / Right Stick  "
                   "Reset: R  Exit: Esc\n"
                   "State: %s  Combo: %d  Enemy HP: %.0f  Buffered: %s  Lock: %s  Respawn: %.1f",
                   combat::CombatStateName(player_.GetState()), player_.GetComboIndex() + 1,
@@ -177,14 +175,6 @@ void GameScene::UpdateOrbitCamera(float deltaTime) {
 
         cameraYaw_ -= static_cast<float>(input->GetMouseDX()) * kOrbitMouseYawSpeed;
         cameraPitch_ += static_cast<float>(input->GetMouseDY()) * kOrbitMousePitchSpeed;
-
-        if (input->IsKeyPress(DIK_Z)) {
-            cameraDistance_ += kOrbitZoomSpeed * deltaTime;
-        }
-        if (input->IsKeyPress(DIK_C)) {
-            cameraDistance_ -= kOrbitZoomSpeed * deltaTime;
-        }
-        cameraDistance_ -= static_cast<float>(input->GetMouseWheel()) * kOrbitWheelZoomSpeed;
     }
 
     cameraPitch_ = std::clamp(cameraPitch_, kOrbitMinPitch, kOrbitMaxPitch);

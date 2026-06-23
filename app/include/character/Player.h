@@ -128,13 +128,17 @@ private:
     /// </summary>
     /// <param name="comboIndex">開始するコンボ段数インデックス。</param>
     /// <param name="enemyPosition">攻撃開始時に向く敵位置。</param>
-    void StartAttack(int comboIndex, const DirectX::XMFLOAT3& enemyPosition);
+    /// <param name="attackDirection">攻撃方向へ使う入力方向。入力がない場合は nullptr。</param>
+    void StartAttack(int comboIndex, const DirectX::XMFLOAT3& enemyPosition,
+                     const DirectX::XMFLOAT3* attackDirection);
 
     /// <summary>
     /// バッファ入力があり、派生可能なら次のコンボ段へ進める。
     /// </summary>
     /// <param name="enemyPosition">次段開始時に向く敵位置。</param>
-    void AdvanceComboIfBuffered(const DirectX::XMFLOAT3& enemyPosition);
+    /// <param name="attackDirection">次段の攻撃方向へ使う入力方向。入力がない場合は nullptr。</param>
+    void AdvanceComboIfBuffered(const DirectX::XMFLOAT3& enemyPosition,
+                                const DirectX::XMFLOAT3* attackDirection);
 
     /// <summary>
     /// 現在の攻撃を終了して待機状態へ戻す。
@@ -151,6 +155,18 @@ private:
     /// 入力バッファを空にする。
     /// </summary>
     void ClearAttackBuffer();
+
+    /// <summary>
+    /// 入力からカメラ基準の水平移動方向を計算する。
+    /// </summary>
+    /// <param name="input">移動入力に使う入力状態。入力がない場合は nullptr。</param>
+    /// <param name="cameraForward">カメラが向いている水平前方向。</param>
+    /// <param name="cameraRight">カメラから見た水平右方向。</param>
+    /// <param name="outMoveDirection">計算した水平移動方向の出力先。</param>
+    /// <returns>有効な方向入力がある場合は true。</returns>
+    [[nodiscard]] bool TryCalculateCameraRelativeMoveDirection(
+        const Input* input, const DirectX::XMFLOAT3& cameraForward,
+        const DirectX::XMFLOAT3& cameraRight, DirectX::XMFLOAT3& outMoveDirection) const;
 
     /// <summary>
     /// 現在攻撃状態かを取得する。

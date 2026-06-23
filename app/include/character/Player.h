@@ -181,11 +181,43 @@ private:
     [[nodiscard]] bool CanChainNow() const;
 
     /// <summary>
+    /// 攻撃ごとの踏み込みを現在フレーム分だけ適用する。
+    /// </summary>
+    /// <param name="move">現在の攻撃性能。</param>
+    /// <param name="previousTimer">更新前の攻撃経過秒数。</param>
+    /// <param name="currentTimer">更新後の攻撃経過秒数。</param>
+    /// <param name="enemyPosition">踏み込み過ぎ防止に使う敵位置。</param>
+    void ApplyAttackLunge(const combat::AttackMove& move, float previousTimer,
+                          float currentTimer, const DirectX::XMFLOAT3& enemyPosition);
+
+    /// <summary>
+    /// 指定時刻での踏み込み進捗を 0 から 1 で取得する。
+    /// </summary>
+    /// <param name="move">現在の攻撃性能。</param>
+    /// <param name="timer">攻撃経過秒数。</param>
+    /// <returns>踏み込み区間内の正規化進捗。</returns>
+    [[nodiscard]] float CalculateLungeProgress(const combat::AttackMove& move,
+                                                float timer) const;
+
+    /// <summary>
+    /// 攻撃性能に設定されたローカル踏み込み方向をワールド方向へ変換する。
+    /// </summary>
+    /// <param name="move">現在の攻撃性能。</param>
+    /// <returns>正規化済みの水平移動方向。無効な方向ならゼロ。</returns>
+    [[nodiscard]] DirectX::XMFLOAT3 CalculateLungeDirection(
+        const combat::AttackMove& move) const;
+
+    /// <summary>
     /// 攻撃全体の再生時間を計算する。
     /// </summary>
     /// <param name="move">計算対象の攻撃性能。</param>
     /// <returns>startup、active、recovery を合計した秒数。</returns>
     [[nodiscard]] float AttackDuration(const combat::AttackMove& move) const;
+
+    /// <summary>
+    /// ステージ範囲内へプレイヤー位置を制限する。
+    /// </summary>
+    void ClampToStage();
 
     combat::AttackMove rushCombo_[kMaxRushCombo]{};
     int currentComboIndex_ = -1;

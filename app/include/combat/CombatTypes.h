@@ -42,6 +42,10 @@ struct AttackMove {
     HitReaction reaction = HitReaction::Knockback;
     DirectX::XMFLOAT3 hitBoxOffset{0.0f, 0.0f, 0.0f};
     DirectX::XMFLOAT3 hitBoxSize{1.0f, 1.0f, 1.0f};
+    float lungeDistance = 0.0f;
+    DirectX::XMFLOAT3 lungeDirection{1.0f, 0.0f, 0.0f};
+    float lungeStart = 0.0f;
+    float lungeEnd = 0.0f;
 };
 
 /// <summary>

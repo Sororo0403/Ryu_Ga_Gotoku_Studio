@@ -13,6 +13,7 @@ constexpr float kStageHalfWidth = 4.5f;
 constexpr float kStageHalfDepth = 3.5f;
 constexpr float kPlayerHalfWidth = 0.4f;
 constexpr float kPlayerHalfDepth = 0.275f;
+constexpr float kAttackLungeMinEnemySpacing = 0.58f;
 } // namespace
 
 namespace character {
@@ -20,16 +21,16 @@ namespace character {
 void Player::Reset(const DirectX::XMFLOAT3& position, float facing, float health) {
     rushCombo_[0] = {"Rush 1", 0.14f, 0.15f, 0.28f, 0.24f, 0.48f, 8.0f, 0.06f, 0.45f,
                      0.9f, 0.72f, combat::HitReaction::Stick, {0.65f, 0.9f, 0.0f},
-                     {0.78f, 0.75f, 0.92f}};
+                     {0.78f, 0.75f, 0.92f}, 0.0f, {1.0f, 0.0f, 0.0f}, 0.0f, 0.0f};
     rushCombo_[1] = {"Rush 2", 0.13f, 0.16f, 0.30f, 0.24f, 0.50f, 9.0f, 0.065f, 0.55f,
                      0.95f, 0.74f, combat::HitReaction::Stick, {0.72f, 0.9f, 0.0f},
-                     {0.82f, 0.78f, 0.92f}};
+                     {0.82f, 0.78f, 0.92f}, 0.0f, {1.0f, 0.0f, 0.0f}, 0.0f, 0.0f};
     rushCombo_[2] = {"Rush 3", 0.16f, 0.17f, 0.34f, 0.28f, 0.56f, 11.0f, 0.07f, 0.72f,
                      1.0f, 0.78f, combat::HitReaction::Stick, {0.76f, 0.82f, 0.0f},
-                     {0.9f, 0.78f, 1.0f}};
+                     {0.9f, 0.78f, 1.0f}, 0.55f, {1.0f, 0.0f, 0.0f}, 0.05f, 0.20f};
     rushCombo_[3] = {"Rush Finish", 0.22f, 0.20f, 0.52f, 0.0f, 0.0f, 18.0f, 0.09f, 1.45f,
                      0.0f, 0.0f, combat::HitReaction::Knockback, {0.86f, 0.95f, 0.0f},
-                     {1.05f, 0.95f, 1.08f}};
+                     {1.05f, 0.95f, 1.08f}, 0.78f, {1.0f, 0.0f, 0.0f}, 0.04f, 0.25f};
 
     transform_ = {};
     transform_.position = position;
@@ -93,7 +94,9 @@ void Player::Update(float deltaTime, const Input* input, const DirectX::XMFLOAT3
             }
         }
 
+        const float previousAttackTimer = attackTimer_;
         attackTimer_ += deltaTime;
+        ApplyAttackLunge(attack, previousAttackTimer, attackTimer_, enemyPosition);
 
         if (attackTimer_ < attack.startup) {
             state_ = combat::CombatState::AttackStartup;
@@ -135,12 +138,7 @@ void Player::Update(float deltaTime, const Input* input, const DirectX::XMFLOAT3
         }
     }
 
-    transform_.position.x =
-        std::clamp(transform_.position.x, -kStageHalfWidth + kPlayerHalfWidth,
-                   kStageHalfWidth - kPlayerHalfWidth);
-    transform_.position.z =
-        std::clamp(transform_.position.z, -kStageHalfDepth + kPlayerHalfDepth,
-                   kStageHalfDepth - kPlayerHalfDepth);
+    ClampToStage();
 }
 
 void Player::NotifyHitStopConsumed(float deltaTime) {
@@ -341,8 +339,83 @@ bool Player::CanChainNow() const {
     return attackTimer_ >= attack.chainStart && attackTimer_ <= attack.chainEnd;
 }
 
+void Player::ApplyAttackLunge(const combat::AttackMove& move, float previousTimer,
+                              float currentTimer, const DirectX::XMFLOAT3& enemyPosition) {
+    const float previousProgress = CalculateLungeProgress(move, previousTimer);
+    const float currentProgress = CalculateLungeProgress(move, currentTimer);
+    float lungeDelta = (currentProgress - previousProgress) * move.lungeDistance;
+    if (lungeDelta <= 0.0f) {
+        return;
+    }
+
+    const DirectX::XMFLOAT3 lungeDirection = CalculateLungeDirection(move);
+    const float lungeForwardAmount =
+        lungeDirection.x * GetFacingDirection().x + lungeDirection.z * GetFacingDirection().z;
+    if (lungeDirection.x == 0.0f && lungeDirection.z == 0.0f) {
+        return;
+    }
+
+    const DirectX::XMFLOAT3 forward = GetFacingDirection();
+    const float enemyOffsetX = enemyPosition.x - transform_.position.x;
+    const float enemyOffsetZ = enemyPosition.z - transform_.position.z;
+    const float enemyDistanceAlongForward =
+        enemyOffsetX * forward.x + enemyOffsetZ * forward.z;
+    if (enemyDistanceAlongForward > 0.0f && lungeForwardAmount > 0.0f) {
+        const float allowedDistance =
+            std::max(0.0f, enemyDistanceAlongForward - kAttackLungeMinEnemySpacing);
+        lungeDelta = std::min(lungeDelta, allowedDistance / lungeForwardAmount);
+    }
+
+    transform_.position.x += lungeDirection.x * lungeDelta;
+    transform_.position.z += lungeDirection.z * lungeDelta;
+    ClampToStage();
+}
+
+float Player::CalculateLungeProgress(const combat::AttackMove& move, float timer) const {
+    if (move.lungeDistance <= 0.0f || move.lungeEnd <= move.lungeStart) {
+        return 0.0f;
+    }
+
+    if (timer <= move.lungeStart) {
+        return 0.0f;
+    }
+    if (timer >= move.lungeEnd) {
+        return 1.0f;
+    }
+
+    return (timer - move.lungeStart) / (move.lungeEnd - move.lungeStart);
+}
+
+DirectX::XMFLOAT3 Player::CalculateLungeDirection(const combat::AttackMove& move) const {
+    const DirectX::XMFLOAT3 forward = GetFacingDirection();
+    const DirectX::XMFLOAT3 right{-forward.z, 0.0f, forward.x};
+    DirectX::XMFLOAT3 direction{
+        forward.x * move.lungeDirection.x + right.x * move.lungeDirection.z,
+        0.0f,
+        forward.z * move.lungeDirection.x + right.z * move.lungeDirection.z,
+    };
+
+    const float length = std::sqrt(direction.x * direction.x + direction.z * direction.z);
+    if (length <= 0.0001f) {
+        return {};
+    }
+
+    direction.x /= length;
+    direction.z /= length;
+    return direction;
+}
+
 float Player::AttackDuration(const combat::AttackMove& move) const {
     return move.startup + move.active + move.recovery;
+}
+
+void Player::ClampToStage() {
+    transform_.position.x =
+        std::clamp(transform_.position.x, -kStageHalfWidth + kPlayerHalfWidth,
+                   kStageHalfWidth - kPlayerHalfWidth);
+    transform_.position.z =
+        std::clamp(transform_.position.z, -kStageHalfDepth + kPlayerHalfDepth,
+                   kStageHalfDepth - kPlayerHalfDepth);
 }
 
 } // namespace character

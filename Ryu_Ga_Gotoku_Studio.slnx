@@ -1,7 +1,7 @@
 <Solution>
   <Configurations>
     <Platform Name="x64" />
-    <Platform Name="x86" />
   </Configurations>
-  <Project Path="Ryu_Ga_Gotoku_Studio/Ryu_Ga_Gotoku_Studio.vcxproj" />
+  <Project Path="app/App.vcxproj" />
+  <Project Path="engine/Engine.vcxproj" />
 </Solution>

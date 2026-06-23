@@ -26,12 +26,12 @@ public:
     void Finalize();
     bool IsReady() const;
 
-    void DrawText(std::string_view utf8Text, const DirectX::XMFLOAT2& position,
-                  const TextStyle& style = {});
-    void DrawText(std::wstring_view text, const DirectX::XMFLOAT2& position,
-                  const TextStyle& style = {});
-    void DrawText(std::u32string_view text, const DirectX::XMFLOAT2& position,
-                  const TextStyle& style = {});
+    void DrawString(std::string_view utf8Text, const DirectX::XMFLOAT2& position,
+                    const TextStyle& style = {});
+    void DrawString(std::wstring_view text, const DirectX::XMFLOAT2& position,
+                    const TextStyle& style = {});
+    void DrawString(std::u32string_view text, const DirectX::XMFLOAT2& position,
+                    const TextStyle& style = {});
 
     TextLayoutMetrics MeasureText(std::string_view utf8Text, const TextStyle& style = {});
     TextLayoutMetrics MeasureText(std::wstring_view text, const TextStyle& style = {});

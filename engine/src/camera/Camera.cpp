@@ -97,6 +97,37 @@ void Camera::SetRotation(const XMFLOAT3& rotation) {
     UpdateMatrices();
 }
 
+void Camera::SetLookAt(const XMFLOAT3& position, const XMFLOAT3& target) {
+    SanitizeProjection();
+    position_ = {FiniteOr(position.x, position_.x), FiniteOr(position.y, position_.y),
+                 FiniteOr(position.z, position_.z)};
+    const XMFLOAT3 safeTarget{FiniteOr(target.x, position_.x), FiniteOr(target.y, position_.y),
+                              FiniteOr(target.z, position_.z + 1.0f)};
+
+    const XMVECTOR eye = XMLoadFloat3(&position_);
+    XMVECTOR focus = XMLoadFloat3(&safeTarget);
+    if (XMVectorGetX(XMVector3LengthSq(focus - eye)) < 0.000001f) {
+        focus = eye + XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+    }
+
+    const XMMATRIX view = XMMatrixLookAtLH(eye, focus, XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f));
+    view_ = IsFiniteMatrix(view) ? view : XMMatrixIdentity();
+
+    if (projectionMode_ == ProjectionMode::Orthographic) {
+        proj_ = XMMatrixOrthographicLH(orthographicHeight_ * aspect_, orthographicHeight_, nearZ_,
+                                       farZ_);
+    } else {
+        proj_ = XMMatrixPerspectiveFovLH(fovY_, aspect_, nearZ_, farZ_);
+    }
+    if (!IsFiniteMatrix(proj_)) {
+        proj_ = XMMatrixIdentity();
+    }
+    viewProjection_ = view_ * proj_;
+    if (!IsFiniteMatrix(viewProjection_)) {
+        viewProjection_ = XMMatrixIdentity();
+    }
+}
+
 void Camera::SetAspect(float aspect) {
     aspect_ = aspect;
     UpdateMatrices();

@@ -59,7 +59,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)include;$(MSBuildThisFileDirectory)..\engine\public;$(MSBuildThisFileDirectory)..\engine\include;$(MSBuildThisFileDirectory)..\engine\externals;$(MSBuildThisFileDirectory)..\engine\externals\DirectX-Headers;$(MSBuildThisFileDirectory)..\engine\externals\DirectXTex;$(MSBuildThisFileDirectory)..\engine\externals\imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -86,7 +86,7 @@ if exist "$(MSBuildThisFileDirectory)..\engine\resources" xcopy /E /I /Y "$(MSBu
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)include;$(MSBuildThisFileDirectory)..\engine\public;$(MSBuildThisFileDirectory)..\engine\include;$(MSBuildThisFileDirectory)..\engine\externals;$(MSBuildThisFileDirectory)..\engine\externals\DirectX-Headers;$(MSBuildThisFileDirectory)..\engine\externals\DirectXTex;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -109,10 +109,18 @@ if exist "$(MSBuildThisFileDirectory)..\engine\resources" xcopy /E /I /Y "$(MSBu
   </ItemDefinitionGroup>
 
   <ItemGroup>
+    <ClCompile Include="src\character\CombatCharacter.cpp" />
+    <ClCompile Include="src\character\Enemy.cpp" />
+    <ClCompile Include="src\character\Player.cpp" />
+    <ClCompile Include="src\combat\CombatTypes.cpp" />
     <ClCompile Include="src\scene\GameScene.cpp" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\character\CombatCharacter.h" />
+    <ClInclude Include="include\character\Enemy.h" />
+    <ClInclude Include="include\character\Player.h" />
+    <ClInclude Include="include\combat\CombatTypes.h" />
     <ClInclude Include="include\scene\GameScene.h" />
   </ItemGroup>
   <ItemGroup>

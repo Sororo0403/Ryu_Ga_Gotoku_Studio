@@ -4,9 +4,6 @@
 #include "core/ResourceHandle.h"
 #include "texture/TextureManager.h"
 
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
 #include <algorithm>
 #include <cmath>
 #include <cwctype>

@@ -24,6 +24,12 @@ public:
     /// Rotationを設定する
     /// </summary>
     void SetRotation(const DirectX::XMFLOAT3& rotation);
+    /// <summary>
+    /// 指定位置へカメラを置き、対象点を見るビュー行列を設定する。
+    /// </summary>
+    /// <param name="position">カメラを配置するワールド座標。</param>
+    /// <param name="target">カメラが注視するワールド座標。</param>
+    void SetLookAt(const DirectX::XMFLOAT3& position, const DirectX::XMFLOAT3& target);
     void SetAspect(float aspect);
     void SetPerspectiveFovDeg(float fovDeg);
     /// <summary>

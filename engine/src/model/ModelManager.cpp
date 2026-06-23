@@ -8,6 +8,7 @@
 #include "graphics/SrvManager.h"
 #include "internal/ModelPrimitiveFactory.h"
 #include "internal/ModelSkinClusterResourceUtils.h"
+#include "model/AssimpLoader.h"
 #include "model/MaterialManager.h"
 #include "model/Vertex.h"
 
@@ -16,6 +17,7 @@
 #include <exception>
 #include <filesystem>
 #include <limits>
+#include <memory>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -237,6 +239,8 @@ uint32_t AppendPrimitiveModel(std::vector<Model>& models, MeshManager& meshManag
 
 } // namespace
 
+ModelManager::ModelManager() = default;
+
 ModelManager::~ModelManager() {
     Finalize(true);
 }
@@ -258,7 +262,8 @@ void ModelManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager,
     meshManager_.Initialize(dxCommon_);
     materialManager_.Initialize(dxCommon_);
 
-    assimpLoader_.Initialize(textureManager_, &meshManager_, &materialManager_);
+    assimpLoader_ = std::make_unique<AssimpLoader>();
+    assimpLoader_->Initialize(textureManager_, &meshManager_, &materialManager_);
 
     modelRenderer_.Initialize(dxCommon_, srvManager, &meshManager_, textureManager_,
                               &materialManager_);
@@ -289,6 +294,7 @@ bool ModelManager::Finalize(bool allowFrameAbort) {
     if (!meshManager_.Finalize(allowFrameAbort)) {
         return false;
     }
+    assimpLoader_.reset();
     dxCommon_ = nullptr;
     srvManager_ = nullptr;
     textureManager_ = nullptr;
@@ -353,7 +359,11 @@ uint32_t ModelManager::Load(const std::wstring& path) {
         return kInvalidResourceId;
     }
 
-    Model model = assimpLoader_.Load(pathStr);
+    if (!assimpLoader_) {
+        return kInvalidResourceId;
+    }
+
+    Model model = assimpLoader_->Load(pathStr);
     if (model.subMeshes.empty()) {
         return kInvalidResourceId;
     }

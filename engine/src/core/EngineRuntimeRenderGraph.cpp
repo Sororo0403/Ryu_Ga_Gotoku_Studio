@@ -109,6 +109,7 @@ template <typename Systems> bool AddSceneColorPass(Systems& systems) {
         (void)pass;
         GpuProfiler::ScopedEvent gpuEvent(systems.gpuProfiler, "SceneColor");
         systems.meshRenderer.PreDraw();
+        systems.modelManager.PreDraw();
         systems.sceneManager.Draw();
     });
 }
@@ -138,6 +139,7 @@ template <typename Systems> bool AddTransparentPass(Systems& systems) {
             systems.sceneManager.DrawTransparent();
             systems.transparentQueue.Flush();
         }
+        systems.modelManager.PostDraw();
         systems.meshRenderer.PostDraw();
         systems.dxCommon.EndScenePass();
     });

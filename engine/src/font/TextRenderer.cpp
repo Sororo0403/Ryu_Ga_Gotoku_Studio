@@ -300,24 +300,24 @@ bool TextRenderer::IsReady() const {
     return fontManager_ != nullptr && spriteRenderer_ != nullptr && fontManager_->IsReady();
 }
 
-void TextRenderer::DrawText(std::string_view utf8Text, const DirectX::XMFLOAT2& position,
-                            const TextStyle& style) {
+void TextRenderer::DrawString(std::string_view utf8Text, const DirectX::XMFLOAT2& position,
+                              const TextStyle& style) {
     if (!IsReady()) {
         return;
     }
     DrawCodepoints(*fontManager_, *spriteRenderer_, DecodeUtf8(utf8Text), position, style);
 }
 
-void TextRenderer::DrawText(std::wstring_view text, const DirectX::XMFLOAT2& position,
-                            const TextStyle& style) {
+void TextRenderer::DrawString(std::wstring_view text, const DirectX::XMFLOAT2& position,
+                              const TextStyle& style) {
     if (!IsReady()) {
         return;
     }
     DrawCodepoints(*fontManager_, *spriteRenderer_, DecodeWide(text), position, style);
 }
 
-void TextRenderer::DrawText(std::u32string_view text, const DirectX::XMFLOAT2& position,
-                            const TextStyle& style) {
+void TextRenderer::DrawString(std::u32string_view text, const DirectX::XMFLOAT2& position,
+                              const TextStyle& style) {
     if (!IsReady()) {
         return;
     }

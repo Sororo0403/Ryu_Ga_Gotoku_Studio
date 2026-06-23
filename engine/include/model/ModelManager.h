@@ -1,7 +1,6 @@
 #pragma once
 #include "animation/Animator.h"
 #include "core/ResourceHandle.h"
-#include "model/AssimpLoader.h"
 #include "model/MaterialManager.h"
 #include "model/MeshManager.h"
 #include "model/Model.h"
@@ -9,6 +8,7 @@
 
 #include <cstdint>
 #include <initializer_list>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -16,12 +16,14 @@
 class DirectXCommon;
 class SrvManager;
 class TextureManager;
+class AssimpLoader;
 
 /// <summary>
 /// モデル読み込みと描画関連サブシステムを統括する
 /// </summary>
 class ModelManager {
 public:
+    ModelManager();
     ~ModelManager();
 
     /// <summary>
@@ -319,7 +321,7 @@ private:
 
     MeshManager meshManager_;
     MaterialManager materialManager_;
-    AssimpLoader assimpLoader_;
+    std::unique_ptr<AssimpLoader> assimpLoader_;
     ModelRenderer modelRenderer_;
     Animator animator_;
 

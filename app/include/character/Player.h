@@ -2,6 +2,8 @@
 
 #include "character/CombatCharacter.h"
 
+#include <filesystem>
+
 class Input;
 
 namespace character {
@@ -21,6 +23,25 @@ public:
     /// <param name="facing">初期の X 方向の向き。</param>
     /// <param name="health">初期体力。</param>
     void Reset(const DirectX::XMFLOAT3& position, float facing, float health);
+
+    /// <summary>
+    /// 弱攻撃・強攻撃コンボの攻撃性能を標準値へ戻す。
+    /// </summary>
+    void ResetAttackDataToDefaults();
+
+    /// <summary>
+    /// JSON ファイルから攻撃性能を読み込む。
+    /// </summary>
+    /// <param name="path">読み込む JSON ファイル。</param>
+    /// <returns>読み込みに成功した場合は true。</returns>
+    bool LoadAttackData(const std::filesystem::path& path);
+
+    /// <summary>
+    /// 現在の攻撃性能を JSON ファイルへ保存する。
+    /// </summary>
+    /// <param name="path">保存先 JSON ファイル。</param>
+    /// <returns>保存に成功した場合は true。</returns>
+    bool SaveAttackData(const std::filesystem::path& path) const;
 
     /// <summary>
     /// 弱攻撃・強攻撃入力、入力バッファ、リセット入力を更新する。
@@ -127,6 +148,26 @@ public:
     /// </summary>
     /// <returns>現在のコンボ段に対応する攻撃性能。</returns>
     [[nodiscard]] const combat::AttackMove& CurrentAttack() const;
+
+    /// <summary>
+    /// 弱攻撃コンボの段数を取得する。
+    /// </summary>
+    [[nodiscard]] int GetWeakAttackCount() const;
+
+    /// <summary>
+    /// 強攻撃コンボの段数を取得する。
+    /// </summary>
+    [[nodiscard]] int GetStrongAttackCount() const;
+
+    /// <summary>
+    /// 編集用に弱攻撃性能を取得する。
+    /// </summary>
+    [[nodiscard]] combat::AttackMove& GetWeakAttack(int index);
+
+    /// <summary>
+    /// 編集用に強攻撃性能を取得する。
+    /// </summary>
+    [[nodiscard]] combat::AttackMove& GetStrongAttack(int index);
 
     /// <summary>
     /// 現在の攻撃判定形状を作成し、デバッグ描画用 Transform も更新する。

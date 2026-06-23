@@ -2,8 +2,11 @@
 
 #include "input/Input.h"
 
+#include "nlohmann/json.hpp"
+
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 
 namespace {
 constexpr float kInputBufferSeconds = 0.18f;
@@ -14,11 +17,104 @@ constexpr float kStageHalfDepth = 3.5f;
 constexpr float kPlayerHalfWidth = 0.4f;
 constexpr float kPlayerHalfDepth = 0.275f;
 constexpr float kAttackLungeMinEnemySpacing = 0.58f;
+
+nlohmann::json Vec3ToJson(const DirectX::XMFLOAT3& value) {
+    return nlohmann::json::array({value.x, value.y, value.z});
+}
+
+DirectX::XMFLOAT3 JsonToVec3(const nlohmann::json& json, const DirectX::XMFLOAT3& fallback) {
+    if (!json.is_array() || json.size() != 3) {
+        return fallback;
+    }
+
+    return {
+        json[0].get<float>(),
+        json[1].get<float>(),
+        json[2].get<float>(),
+    };
+}
+
+const char* HitReactionToString(combat::HitReaction reaction) {
+    switch (reaction) {
+    case combat::HitReaction::Stick:
+        return "Stick";
+    case combat::HitReaction::Knockback:
+    default:
+        return "Knockback";
+    }
+}
+
+combat::HitReaction HitReactionFromString(const std::string& value,
+                                          combat::HitReaction fallback) {
+    if (value == "Stick") {
+        return combat::HitReaction::Stick;
+    }
+    if (value == "Knockback") {
+        return combat::HitReaction::Knockback;
+    }
+    return fallback;
+}
+
+nlohmann::json AttackMoveToJson(const combat::AttackMove& move) {
+    return {
+        {"name", move.name},
+        {"startup", move.startup},
+        {"active", move.active},
+        {"recovery", move.recovery},
+        {"chainStart", move.chainStart},
+        {"chainEnd", move.chainEnd},
+        {"damage", move.damage},
+        {"hitStop", move.hitStop},
+        {"knockback", move.knockback},
+        {"pullDistance", move.pullDistance},
+        {"pullStrength", move.pullStrength},
+        {"reaction", HitReactionToString(move.reaction)},
+        {"hitBoxOffset", Vec3ToJson(move.hitBoxOffset)},
+        {"hitBoxSize", Vec3ToJson(move.hitBoxSize)},
+        {"lungeDistance", move.lungeDistance},
+        {"lungeDirection", Vec3ToJson(move.lungeDirection)},
+        {"lungeStart", move.lungeStart},
+        {"lungeEnd", move.lungeEnd},
+        {"hitStun", move.hitStun},
+    };
+}
+
+void ApplyAttackMoveJson(const nlohmann::json& json, combat::AttackMove& move) {
+    if (!json.is_object()) {
+        return;
+    }
+
+    move.name = json.value("name", move.name);
+    move.startup = json.value("startup", move.startup);
+    move.active = json.value("active", move.active);
+    move.recovery = json.value("recovery", move.recovery);
+    move.chainStart = json.value("chainStart", move.chainStart);
+    move.chainEnd = json.value("chainEnd", move.chainEnd);
+    move.damage = json.value("damage", move.damage);
+    move.hitStop = json.value("hitStop", move.hitStop);
+    move.knockback = json.value("knockback", move.knockback);
+    move.pullDistance = json.value("pullDistance", move.pullDistance);
+    move.pullStrength = json.value("pullStrength", move.pullStrength);
+    move.reaction = HitReactionFromString(json.value("reaction", std::string{}), move.reaction);
+    if (json.contains("hitBoxOffset")) {
+        move.hitBoxOffset = JsonToVec3(json["hitBoxOffset"], move.hitBoxOffset);
+    }
+    if (json.contains("hitBoxSize")) {
+        move.hitBoxSize = JsonToVec3(json["hitBoxSize"], move.hitBoxSize);
+    }
+    move.lungeDistance = json.value("lungeDistance", move.lungeDistance);
+    if (json.contains("lungeDirection")) {
+        move.lungeDirection = JsonToVec3(json["lungeDirection"], move.lungeDirection);
+    }
+    move.lungeStart = json.value("lungeStart", move.lungeStart);
+    move.lungeEnd = json.value("lungeEnd", move.lungeEnd);
+    move.hitStun = json.value("hitStun", move.hitStun);
+}
 } // namespace
 
 namespace character {
 
-void Player::Reset(const DirectX::XMFLOAT3& position, float facing, float health) {
+void Player::ResetAttackDataToDefaults() {
     weakCombo_[0] = {"Weak 1", 0.14f, 0.15f, 0.28f, 0.24f, 0.48f, 8.0f, 0.06f, 0.45f,
                      0.9f, 0.72f, combat::HitReaction::Stick, {0.65f, 0.9f, 0.0f},
                      {0.78f, 0.75f, 0.92f}, 0.0f, {1.0f, 0.0f, 0.0f}, 0.0f, 0.0f};
@@ -39,6 +135,69 @@ void Player::Reset(const DirectX::XMFLOAT3& position, float facing, float health
                        2.35f, 0.0f, 0.0f, combat::HitReaction::Knockback,
                        {1.02f, 0.98f, 0.0f}, {1.34f, 1.08f, 1.18f}, 1.10f,
                        {1.0f, 0.0f, 0.0f}, 0.05f, 0.34f, 0.60f};
+}
+
+bool Player::LoadAttackData(const std::filesystem::path& path) {
+    ResetAttackDataToDefaults();
+    std::ifstream file(path);
+    if (!file) {
+        return false;
+    }
+
+    try {
+        nlohmann::json root{};
+        file >> root;
+        if (const auto weak = root.find("weak"); weak != root.end() && weak->is_array()) {
+            const size_t count =
+                std::min(weak->size(), static_cast<size_t>(kMaxWeakCombo));
+            for (size_t i = 0; i < count; ++i) {
+                ApplyAttackMoveJson((*weak)[i], weakCombo_[i]);
+            }
+        }
+        if (const auto strong = root.find("strong");
+            strong != root.end() && strong->is_array()) {
+            const size_t count =
+                std::min(strong->size(), static_cast<size_t>(kMaxStrongCombo));
+            for (size_t i = 0; i < count; ++i) {
+                ApplyAttackMoveJson((*strong)[i], strongCombo_[i]);
+            }
+        }
+        return true;
+    } catch (const std::exception&) {
+        ResetAttackDataToDefaults();
+        return false;
+    }
+}
+
+bool Player::SaveAttackData(const std::filesystem::path& path) const {
+    try {
+        std::filesystem::create_directories(path.parent_path());
+
+        nlohmann::json root{};
+        root["weak"] = nlohmann::json::array();
+        for (const combat::AttackMove& move : weakCombo_) {
+            root["weak"].push_back(AttackMoveToJson(move));
+        }
+        root["strong"] = nlohmann::json::array();
+        for (const combat::AttackMove& move : strongCombo_) {
+            root["strong"].push_back(AttackMoveToJson(move));
+        }
+
+        std::ofstream file(path);
+        if (!file) {
+            return false;
+        }
+        file << root.dump(2) << '\n';
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+void Player::Reset(const DirectX::XMFLOAT3& position, float facing, float health) {
+    if (weakCombo_[0].name.empty() || strongCombo_[0].name.empty()) {
+        ResetAttackDataToDefaults();
+    }
 
     transform_ = {};
     transform_.position = position;
@@ -230,6 +389,22 @@ const combat::AttackMove& Player::CurrentAttack() const {
 
     const int index = std::clamp(currentComboIndex_, 0, kMaxWeakCombo - 1);
     return weakCombo_[index];
+}
+
+int Player::GetWeakAttackCount() const {
+    return kMaxWeakCombo;
+}
+
+int Player::GetStrongAttackCount() const {
+    return kMaxStrongCombo;
+}
+
+combat::AttackMove& Player::GetWeakAttack(int index) {
+    return weakCombo_[std::clamp(index, 0, kMaxWeakCombo - 1)];
+}
+
+combat::AttackMove& Player::GetStrongAttack(int index) {
+    return strongCombo_[std::clamp(index, 0, kMaxStrongCombo - 1)];
 }
 
 CollisionManager::Shape Player::MakeAttackShape(Transform& outDebugTransform) const {

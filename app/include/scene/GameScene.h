@@ -7,6 +7,8 @@
 #include "model/Transform.h"
 
 #include <cstdint>
+#include <filesystem>
+#include <string>
 
 /// <summary>
 /// アプリケーションで使用するメインゲームシーン。
@@ -30,11 +32,16 @@ public:
     void Draw() override;
 
     /// <summary>
-    /// ポストプロセス後の 2D デバッグ表示を描画する。
+    /// ポストプロセス後の ImGui デバッグ表示を描画する。
     /// </summary>
     void DrawPostProcessOverlay() override;
 
 private:
+    /// <summary>
+    /// 攻撃性能 JSON を読み込み、存在しなければ既定値で保存する。
+    /// </summary>
+    void InitializeAttackData();
+
     /// <summary>
     /// 戦闘シーン用のカメラを作成してアクティブにする。
     /// </summary>
@@ -113,6 +120,18 @@ private:
     /// </summary>
     void DrawAttackDebug() const;
 
+    /// <summary>
+    /// 戦闘状態と攻撃性能調整用の ImGui UI を描画する。
+    /// </summary>
+    void DrawDebugUi();
+
+    /// <summary>
+    /// 攻撃性能 1 段分の ImGui 編集 UI を描画する。
+    /// </summary>
+    /// <param name="move">編集対象の攻撃性能。</param>
+    /// <param name="label">ImGui 表示用ラベル。</param>
+    void DrawAttackMoveEditor(combat::AttackMove& move, const char* label);
+
 private:
     character::Player player_{};
     character::Enemy enemy_{};
@@ -132,4 +151,8 @@ private:
 
     float enemyRespawnTimer_ = 0.0f;
     bool enemyRespawnPending_ = false;
+
+    std::filesystem::path attackDataPath_{};
+    std::string attackDataStatus_{};
+    bool debugUiMode_ = false;
 };

@@ -77,7 +77,8 @@
     </Manifest>
     <PostBuildEvent>
       <Command>if exist "$(MSBuildThisFileDirectory)..\generated\outputs\$(Platform)\$(Configuration)\Engine\*.dll" copy /Y "$(MSBuildThisFileDirectory)..\generated\outputs\$(Platform)\$(Configuration)\Engine\*.dll" "$(OutDir)"
-if exist "$(MSBuildThisFileDirectory)..\engine\resources" xcopy /E /I /Y "$(MSBuildThisFileDirectory)..\engine\resources" "$(OutDir)engine\resources"</Command>
+if exist "$(MSBuildThisFileDirectory)..\engine\resources" xcopy /E /I /Y "$(MSBuildThisFileDirectory)..\engine\resources" "$(OutDir)engine\resources"
+if exist "$(MSBuildThisFileDirectory)resources" xcopy /E /I /Y "$(MSBuildThisFileDirectory)resources" "$(OutDir)resources"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -104,7 +105,8 @@ if exist "$(MSBuildThisFileDirectory)..\engine\resources" xcopy /E /I /Y "$(MSBu
     </Manifest>
     <PostBuildEvent>
       <Command>if exist "$(MSBuildThisFileDirectory)..\generated\outputs\$(Platform)\$(Configuration)\Engine\*.dll" copy /Y "$(MSBuildThisFileDirectory)..\generated\outputs\$(Platform)\$(Configuration)\Engine\*.dll" "$(OutDir)"
-if exist "$(MSBuildThisFileDirectory)..\engine\resources" xcopy /E /I /Y "$(MSBuildThisFileDirectory)..\engine\resources" "$(OutDir)engine\resources"</Command>
+if exist "$(MSBuildThisFileDirectory)..\engine\resources" xcopy /E /I /Y "$(MSBuildThisFileDirectory)..\engine\resources" "$(OutDir)engine\resources"
+if exist "$(MSBuildThisFileDirectory)resources" xcopy /E /I /Y "$(MSBuildThisFileDirectory)resources" "$(OutDir)resources"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
 
@@ -127,6 +129,9 @@ if exist "$(MSBuildThisFileDirectory)..\engine\resources" xcopy /E /I /Y "$(MSBu
     <ProjectReference Include="..\engine\Engine.vcxproj">
       <Project>{8d69c2b4-4f39-47f0-9a40-4cb78ec442a1}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="resources\combat\player_attacks.json" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

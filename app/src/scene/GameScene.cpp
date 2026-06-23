@@ -1,15 +1,19 @@
 #include "scene/GameScene.h"
 
 #include "camera/CameraManager.h"
+#include "core/AssetManager.h"
 #include "core/WinApp.h"
-#include "font/TextRenderer.h"
 #include "input/Input.h"
 #include "model/Material.h"
 #include "model/ModelManager.h"
 
+#ifdef _DEBUG
+#include "imgui.h"
+#endif
+
 #include <algorithm>
 #include <cmath>
-#include <cstdio>
+#include <system_error>
 
 namespace {
 constexpr float kFloorTopY = 0.04f;
@@ -42,11 +46,13 @@ Material MakeMaterial(float r, float g, float b, float a = 1.0f) {
 
 void GameScene::Initialize(const SceneContext& ctx) {
     BaseScene::Initialize(ctx);
+    debugUiMode_ = false;
     if (ctx_->systems.winApp) {
         ctx_->systems.winApp->SetCursorVisible(false);
     }
     InitializeCamera();
     InitializeModels();
+    InitializeAttackData();
     ResetCombat();
 
     if (ctx_->systems.log) {
@@ -62,13 +68,21 @@ void GameScene::Update() {
     const float deltaTime = std::clamp(ctx_->frame.deltaTime, 0.0f, 1.0f / 20.0f);
 
     if (Input* input = ctx_->systems.input) {
+        if (input->IsKeyTrigger(DIK_F1)) {
+            debugUiMode_ = !debugUiMode_;
+            if (ctx_->systems.winApp) {
+                ctx_->systems.winApp->SetCursorVisible(debugUiMode_);
+            }
+        }
         if (input->IsKeyTrigger(DIK_ESCAPE)) {
             if (ctx_->systems.winApp) {
                 ctx_->systems.winApp->RequestClose();
             }
             return;
         }
-        player_.UpdateInput(*input, deltaTime);
+        if (!debugUiMode_) {
+            player_.UpdateInput(*input, deltaTime);
+        }
         if (player_.ShouldResetRequested()) {
             ResetCombat();
             UpdateOrbitCamera(deltaTime);
@@ -83,15 +97,16 @@ void GameScene::Update() {
     }
 
     if (UpdateEnemyRespawn(deltaTime)) {
-        player_.Update(deltaTime, ctx_->systems.input, CalculateCameraForward(),
-                       CalculateCameraRight(), enemy_.GetTransform().position);
+        player_.Update(deltaTime, debugUiMode_ ? nullptr : ctx_->systems.input,
+                       CalculateCameraForward(), CalculateCameraRight(),
+                       enemy_.GetTransform().position);
         UpdateCollisionBodies();
         UpdateOrbitCamera(deltaTime);
         return;
     }
 
-    player_.Update(deltaTime, ctx_->systems.input, CalculateCameraForward(), CalculateCameraRight(),
-                   enemy_.GetTransform().position);
+    player_.Update(deltaTime, debugUiMode_ ? nullptr : ctx_->systems.input, CalculateCameraForward(),
+                   CalculateCameraRight(), enemy_.GetTransform().position);
     enemy_.Update(deltaTime, player_.GetTransform().position);
     UpdateCollisionBodies();
     ResolveAttackHit();
@@ -117,31 +132,22 @@ void GameScene::Draw() {
 }
 
 void GameScene::DrawPostProcessOverlay() {
-    if (!ctx_ || !ctx_->rendering.text) {
+    DrawDebugUi();
+}
+
+void GameScene::InitializeAttackData() {
+    attackDataPath_ = AssetManager::ResolvePath("resources/combat/player_attacks.json");
+    if (player_.LoadAttackData(attackDataPath_)) {
+        attackDataStatus_ = "Loaded: " + attackDataPath_.string();
         return;
     }
 
-    char text[384]{};
-    const char* attackName =
-        player_.GetComboIndex() >= 0 ? player_.CurrentAttack().name : "None";
-    std::snprintf(text, sizeof(text),
-                  "Weak / Strong Combo Prototype\n"
-                  "Move: WASD / Left Stick  Weak: J / Left Click / Pad X  "
-                  "Strong: K / Pad Y  "
-                  "Lock: LShift / Right Click / LB  Camera: Mouse / Right Stick  "
-                  "Reset: R  Exit: Esc\n"
-                  "State: %s  Move: %s  Enemy HP: %.0f  WeakBuf: %s  StrongBuf: %s  "
-                  "Lock: %s  Respawn: %.1f",
-                  combat::CombatStateName(player_.GetState()), attackName, enemy_.GetHealth(),
-                  player_.HasBufferedAttack() ? "yes" : "no",
-                  player_.HasBufferedStrongAttack() ? "yes" : "no",
-                  player_.IsLockOnHeld() ? "on" : "off",
-                  enemyRespawnPending_ ? enemyRespawnTimer_ : 0.0f);
-
-    TextStyle style{};
-    style.pixelSize = 22.0f;
-    style.color = {0.92f, 0.96f, 1.0f, 1.0f};
-    ctx_->rendering.text->DrawString(text, {24.0f, 22.0f}, style);
+    player_.ResetAttackDataToDefaults();
+    if (player_.SaveAttackData(attackDataPath_)) {
+        attackDataStatus_ = "Created defaults: " + attackDataPath_.string();
+    } else {
+        attackDataStatus_ = "Using built-in defaults; failed to write: " + attackDataPath_.string();
+    }
 }
 
 void GameScene::InitializeCamera() {
@@ -169,7 +175,7 @@ void GameScene::UpdateOrbitCamera(float deltaTime) {
         return;
     }
 
-    if (Input* input = ctx_->systems.input) {
+    if (Input* input = debugUiMode_ ? nullptr : ctx_->systems.input) {
         float yawInput = 0.0f;
         float pitchInput = 0.0f;
         yawInput += input->GetGamepadRightStickX();
@@ -361,4 +367,120 @@ void GameScene::DrawAttackDebug() const {
     }
 
     ctx_->rendering.model->Draw(hitBoxModelId_, hitBoxTransform_, *camera);
+}
+
+void GameScene::DrawDebugUi() {
+#ifdef _DEBUG
+    if (!ctx_) {
+        return;
+    }
+
+    const char* attackName =
+        player_.GetComboIndex() >= 0 ? player_.CurrentAttack().name.c_str() : "None";
+
+    ImGui::SetNextWindowPos(ImVec2(18.0f, 18.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(430.0f, 190.0f), ImGuiCond_FirstUseEver);
+    if (ImGui::Begin("Combat Debug")) {
+        ImGui::TextUnformatted("Weak / Strong Combo Prototype");
+        ImGui::Separator();
+        ImGui::Text("Mode: %s  (F1 toggles Game/UI)", debugUiMode_ ? "UI" : "Game");
+        ImGui::TextUnformatted("Move: WASD / Left Stick");
+        ImGui::TextUnformatted("Weak: J / Left Click / Pad X");
+        ImGui::TextUnformatted("Strong: K / Pad Y");
+        ImGui::TextUnformatted("Lock: LShift / Right Click / LB");
+        ImGui::TextUnformatted("Camera: Mouse / Right Stick");
+        ImGui::TextUnformatted("Reset: R  Exit: Esc");
+        ImGui::Separator();
+        ImGui::Text("State: %s", combat::CombatStateName(player_.GetState()));
+        ImGui::Text("Move: %s", attackName);
+        ImGui::Text("Enemy HP: %.0f", enemy_.GetHealth());
+        ImGui::Text("WeakBuf: %s  StrongBuf: %s  Lock: %s",
+                    player_.HasBufferedAttack() ? "yes" : "no",
+                    player_.HasBufferedStrongAttack() ? "yes" : "no",
+                    player_.IsLockOnHeld() ? "on" : "off");
+        ImGui::Text("Respawn: %.1f", enemyRespawnPending_ ? enemyRespawnTimer_ : 0.0f);
+    }
+    ImGui::End();
+
+    ImGui::SetNextWindowPos(ImVec2(18.0f, 230.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(520.0f, 650.0f), ImGuiCond_FirstUseEver);
+    if (ImGui::Begin("Attack Tuning")) {
+        ImGui::TextWrapped("%s", attackDataStatus_.c_str());
+        if (ImGui::Button("Save JSON")) {
+            attackDataStatus_ = player_.SaveAttackData(attackDataPath_)
+                                    ? "Saved: " + attackDataPath_.string()
+                                    : "Save failed: " + attackDataPath_.string();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Reload JSON")) {
+            attackDataStatus_ = player_.LoadAttackData(attackDataPath_)
+                                    ? "Reloaded: " + attackDataPath_.string()
+                                    : "Reload failed; restored defaults";
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Reset Defaults")) {
+            player_.ResetAttackDataToDefaults();
+            attackDataStatus_ = "Reset to built-in defaults";
+        }
+
+        if (ImGui::CollapsingHeader("Weak Attacks", ImGuiTreeNodeFlags_DefaultOpen)) {
+            for (int i = 0; i < player_.GetWeakAttackCount(); ++i) {
+                std::string label = "Weak " + std::to_string(i + 1);
+                DrawAttackMoveEditor(player_.GetWeakAttack(i), label.c_str());
+            }
+        }
+        if (ImGui::CollapsingHeader("Strong Attacks", ImGuiTreeNodeFlags_DefaultOpen)) {
+            for (int i = 0; i < player_.GetStrongAttackCount(); ++i) {
+                std::string label = "Strong " + std::to_string(i + 1);
+                DrawAttackMoveEditor(player_.GetStrongAttack(i), label.c_str());
+            }
+        }
+    }
+    ImGui::End();
+#endif
+}
+
+void GameScene::DrawAttackMoveEditor(combat::AttackMove& move, const char* label) {
+#ifdef _DEBUG
+    if (!ImGui::TreeNode(label)) {
+        return;
+    }
+
+    char nameBuffer[64]{};
+    const size_t copyLength = std::min(move.name.size(), sizeof(nameBuffer) - 1);
+    move.name.copy(nameBuffer, copyLength);
+    nameBuffer[copyLength] = '\0';
+    if (ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer))) {
+        move.name = nameBuffer;
+    }
+
+    ImGui::DragFloat("Startup", &move.startup, 0.005f, 0.0f, 2.0f, "%.3f");
+    ImGui::DragFloat("Active", &move.active, 0.005f, 0.0f, 2.0f, "%.3f");
+    ImGui::DragFloat("Recovery", &move.recovery, 0.005f, 0.0f, 2.0f, "%.3f");
+    ImGui::DragFloat("Chain Start", &move.chainStart, 0.005f, 0.0f, 2.0f, "%.3f");
+    ImGui::DragFloat("Chain End", &move.chainEnd, 0.005f, 0.0f, 2.0f, "%.3f");
+    ImGui::DragFloat("Damage", &move.damage, 0.25f, 0.0f, 200.0f, "%.1f");
+    ImGui::DragFloat("Hit Stop", &move.hitStop, 0.005f, 0.0f, 1.0f, "%.3f");
+    ImGui::DragFloat("Hit Stun", &move.hitStun, 0.005f, 0.0f, 2.0f, "%.3f");
+    ImGui::DragFloat("Knockback", &move.knockback, 0.025f, 0.0f, 8.0f, "%.3f");
+    ImGui::DragFloat("Pull Distance", &move.pullDistance, 0.025f, 0.0f, 4.0f, "%.3f");
+    ImGui::DragFloat("Pull Strength", &move.pullStrength, 0.01f, 0.0f, 1.0f, "%.3f");
+
+    int reaction = move.reaction == combat::HitReaction::Stick ? 0 : 1;
+    const char* reactions[] = {"Stick", "Knockback"};
+    if (ImGui::Combo("Reaction", &reaction, reactions, 2)) {
+        move.reaction =
+            reaction == 0 ? combat::HitReaction::Stick : combat::HitReaction::Knockback;
+    }
+
+    ImGui::DragFloat3("Hit Box Offset", &move.hitBoxOffset.x, 0.025f, -4.0f, 4.0f, "%.3f");
+    ImGui::DragFloat3("Hit Box Size", &move.hitBoxSize.x, 0.025f, 0.05f, 5.0f, "%.3f");
+    ImGui::DragFloat("Lunge Distance", &move.lungeDistance, 0.025f, 0.0f, 5.0f, "%.3f");
+    ImGui::DragFloat3("Lunge Direction", &move.lungeDirection.x, 0.025f, -1.0f, 1.0f,
+                      "%.3f");
+    ImGui::DragFloat("Lunge Start", &move.lungeStart, 0.005f, 0.0f, 2.0f, "%.3f");
+    ImGui::DragFloat("Lunge End", &move.lungeEnd, 0.005f, 0.0f, 2.0f, "%.3f");
+
+    ImGui::TreePop();
+#endif
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <DirectXMath.h>
+#include <string>
 
 namespace combat {
 
@@ -28,7 +29,7 @@ enum class HitReaction {
 /// 弱攻撃・強攻撃コンボ 1 段分の攻撃性能。
 /// </summary>
 struct AttackMove {
-    const char* name = "";
+    std::string name;
     float startup = 0.0f;
     float active = 0.0f;
     float recovery = 0.0f;
